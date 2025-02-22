@@ -1,8 +1,9 @@
-import { List, ActionPanel, Action, Detail, openExtensionPreferences, showToast, Toast, Color } from "@raycast/api";
-import { useMemo, useState, useEffect } from "react";
+import { List, ActionPanel, Action, openExtensionPreferences, Color, getPreferenceValues } from "@raycast/api";
+import { useMemo, useState } from "react";
 import { useModels, useCredits } from "./api";
-import { ModelInfo } from "./types";
+import { ModelInfo, Preferences, SortMode, SORT_OPTIONS } from "./types";
 import { Icon } from "@raycast/api";
+import { groupByFuzzyDate, roundToPenny, formatContextLength, sortModelsByMode } from "./utils";
 
 const getFuzzyDateGroup = (date: Date): string => {
   const now = new Date();
@@ -28,201 +29,107 @@ const getFuzzyDateGroup = (date: Date): string => {
   }
 };
 
-const groupByFuzzyDate = (models: ModelInfo[]) => {
-  const groups: { [key: string]: ModelInfo[] } = {};
-
-  models.forEach(model => {
-    const date = new Date(model.created * 1000);
-    const groupKey = getFuzzyDateGroup(date);
-
-    if (!groups[groupKey]) {
-      groups[groupKey] = [];
-    }
-    groups[groupKey].push(model);
-  });
-
-  return groups;
-};
-
-const roundToPenny = (value: number): number => {
-  // Handle very small numbers (less than $0.01)
-  if (value < 0.01) {
-    return Math.ceil(value * 100) / 100; // Round up to ensure we show at least $0.01
-  }
-  return Math.round(value * 100) / 100;
-};
-
-const formatContextLength = (tokens: number): string => {
-  if (tokens < 1000) {
-    return `${tokens}`;
-  }
-  // If tokens are 1 million or more
-  if (tokens >= 1000000) {
-    const inMillions = Math.round(tokens / 1000000 * 10) / 10;
-    return `${inMillions}M`;
-  }
-  // For tokens between 1000 and 999999
-  const inThousands = Math.round(tokens / 1000);
-  return `${inThousands}k`;
-};
-
 function ModelListItem({ model }: { model: ModelInfo }) {
-  const pricingText = `$${roundToPenny(model.pricing.prompt)}/M input, $${roundToPenny(model.pricing.completion)}/M output`;
+  const preferences = getPreferenceValues<Preferences>();
   
-  // subtitle={pricingText}
+  // Create the actions that we'll reorder based on preference
+  const copyAction = (
+    <Action.CopyToClipboard
+      title={`Copy ${model.id}`}
+      content={model.id}
+    />
+  );
+  
+  const pageAction = (
+    <Action.OpenInBrowser
+      icon={Icon.Info}
+      title="Open Model Page on OpenRouter"
+      url={`https://openrouter.ai/${model.id}`}
+    />
+  );
+  
+  const chatAction = (
+    <Action.OpenInBrowser
+      icon={Icon.Message}
+      title="Open Chat on OpenRouter"
+      url={`https://openrouter.ai/chat?models=${model.id}`}
+    />
+  );
+
+  // Determine which action should be first based on preference
+  const getOrderedActions = () => {
+    const defaultAction = preferences.defaultAction;
+    const actions = [];
+    
+    // Add the preferred action first
+    if (defaultAction === "copy") actions.push(copyAction);
+    else if (defaultAction === "page") actions.push(pageAction);
+    else if (defaultAction === "chat") actions.push(chatAction);
+    
+    // Add the remaining actions
+    if (defaultAction !== "copy") actions.push(copyAction);
+    if (defaultAction !== "page") actions.push(pageAction);
+    if (defaultAction !== "chat") actions.push(chatAction);
+    
+    return actions;
+  };
+  
+  const hasPricing = model.pricing.prompt > 0 || model.pricing.completion > 0;
+  const accessories = [];
+  
+  if (hasPricing) {
+    accessories.push(
+      {
+        icon: Icon.ArrowUp,
+        text: `$${roundToPenny(model.pricing.prompt)}/M`,
+        tooltip: `$${roundToPenny(model.pricing.prompt)}/M input tokens`,
+      },
+      {
+        icon: Icon.ArrowDown,
+        text: `$${roundToPenny(model.pricing.completion)}/M`,
+        tooltip: `$${roundToPenny(model.pricing.completion)}/M output tokens`,
+      }
+    );
+  } else {
+    accessories.push({
+      text: "Free",
+      icon: Icon.Stars,
+    });
+  }
+  
+  accessories.push({
+    tag: {
+      value: `${formatContextLength(model.context_length)}`,
+      color: Color.SecondaryText,
+    },
+    tooltip: `Context Window Length: ${model.context_length.toLocaleString()} tokens`,
+    icon: Icon.Coins,
+  });
+  
   return (
     <List.Item
-      title={model.name}
-      subtitle={model.id}
-      accessories={[
-        {
-          // tag: {
-          //   value: `Input: ${roundToPenny(model.pricing.prompt)}/M`,
-          //   // color: Color.SecondaryText,
-          // },
-          icon: Icon.ArrowUp,
-          // text: `Input: $${roundToPenny(model.pricing.prompt)}/M`,
-          text: `$${roundToPenny(model.pricing.prompt)}/M`,
-        },
-        {
-          // tag: {
-          //   value: `Output: ${roundToPenny(model.pricing.completion)}/M`,
-          //   // color: Color.SecondaryText,
-          // },
-          icon: Icon.ArrowDown,
-          // text: `Output: $${roundToPenny(model.pricing.completion)}/M`,
-          text: `$${roundToPenny(model.pricing.completion)}/M`,
-        },
-        {
-          tag: {
-            // value: `${formatContextLength(model.context_length)} context`,
-            value: `${formatContextLength(model.context_length)}`,
-            color: Color.SecondaryText,
-          },
-          icon: Icon.Coins,
-          // text: `${formatContextLength(model.context_length)} context`,
-        },
-      ]}
+      title={{ 
+        value: model.name,
+        tooltip: model.name,
+      }}
+      subtitle={{ 
+        value: model.id,
+        tooltip: `Model ID: ${model.id}`,
+      }}
+      accessories={accessories}
       actions={
         <ActionPanel>
-          <Action.CopyToClipboard
-            title="Copy Model ID"
-            content={model.id}
-          />
-          <Action.Push
-            title="View Details"
-            target={<ModelDetailView model={model} />}
-          />
-          <Action.OpenInBrowser
-            title="Open Documentation"
-            url={`https://openrouter.ai/docs#${model.id}`}
-          />
+          {getOrderedActions()}
         </ActionPanel>
       }
     />
   );
 }
-
-function ModelDetailView({ model }: { model: ModelInfo }) {
-  const markdown = `
-# ${model.name}
-
-${model.description}
-
-## Technical Details
-
-- **Context Length:** ${model.context_length} tokens
-${model.architecture?.tokenizer ? `- **Tokenizer:** ${model.architecture.tokenizer}` : ''}
-${model.architecture?.instruct_template ? `- **Instruct Template:** ${model.architecture.instruct_template}` : ''}
-
-## Pricing
-
-- **Prompt:** $${model.pricing.prompt} per 1M tokens
-- **Completion:** $${model.pricing.completion} per 1M tokens
-
-${model.per_request_limits ? `## Request Limits
-
-${model.per_request_limits.prompt_tokens ? `- **Max Prompt Tokens:** ${model.per_request_limits.prompt_tokens}` : ''}
-${model.per_request_limits.completion_tokens ? `- **Max Completion Tokens:** ${model.per_request_limits.completion_tokens}` : ''}` : ''}
-  `.trim();
-
-  return (
-    <Detail
-      markdown={markdown}
-      metadata={
-        <Detail.Metadata>
-          <Detail.Metadata.Label
-            title="Model ID"
-            text={model.id}
-          />
-          <Detail.Metadata.Label
-            title="Provider"
-            text={model.id.split("/")[0]}
-          />
-          <Detail.Metadata.Separator />
-          <Detail.Metadata.Label
-            title="Context Length"
-            text={`${model.context_length} tokens`}
-          />
-          <Detail.Metadata.Label
-            title="Prompt Cost"
-            text={`$${model.pricing.prompt}/1M tokens`}
-          />
-          <Detail.Metadata.Label
-            title="Completion Cost"
-            text={`$${model.pricing.completion}/1M tokens`}
-          />
-        </Detail.Metadata>
-      }
-      actions={
-        <ActionPanel>
-          <Action.CopyToClipboard
-            title="Copy Model ID"
-            content={model.id}
-          />
-          <Action.OpenInBrowser
-            title="Open Documentation"
-            url={`https://openrouter.ai/docs#${model.id}`}
-          />
-        </ActionPanel>
-      }
-    />
-  );
-}
-
-type SortMode = "newest" | "context" | "price";
-
-const sortModelsByMode = (models: ModelInfo[], mode: SortMode): ModelInfo[] => {
-  const sortedModels = [...models];
-  
-  switch (mode) {
-    case "newest":
-      return sortedModels.sort((a, b) => (b.created || 0) - (a.created || 0));
-    case "context":
-      return sortedModels.sort((a, b) => b.context_length - a.context_length);
-    case "price":
-      return sortedModels.sort((a, b) => a.pricing.prompt - b.pricing.prompt);
-    default:
-      return sortedModels;
-  }
-};
 
 export default function Command() {
   const { data, isLoading, error } = useModels();
   const { data: creditsData } = useCredits();
-  const [sortMode, setSortMode] = useState<SortMode>("newest");
-
-  useEffect(() => {
-    if (creditsData?.data) {
-      const { total_credits, total_usage } = creditsData.data;
-      const remainingCredits = total_credits - total_usage;
-      showToast({
-        style: Toast.Style.Success,
-        title: "OpenRouter Credits",
-        message: `Balance: $${remainingCredits.toFixed(2)}`,
-      });
-    }
-  }, [creditsData]);
+  const [sortMode, setSortMode] = useState<SortMode>(SORT_OPTIONS.NEWEST);
 
   const groupedModels = useMemo(() => {
     if (!data?.data) {
@@ -232,7 +139,7 @@ export default function Command() {
     const sortedModels = sortModelsByMode(data.data, sortMode);
     
     // Only group by date for "newest" sort mode
-    if (sortMode === "newest") {
+    if (sortMode === SORT_OPTIONS.NEWEST) {
       return groupByFuzzyDate(sortedModels);
     }
     
@@ -257,9 +164,17 @@ export default function Command() {
     );
   }
 
+  const balance = creditsData?.data.total_credits.toFixed(2);
+  const totalSpent = creditsData?.data.total_usage.toFixed(2);
+
+  const navigationTitle = creditsData 
+    ? `Balance: $${balance} ⋅ Total Spent: $${totalSpent}` 
+    : "OpenRouter";
+
   return (
     <List
       isLoading={isLoading}
+      navigationTitle={navigationTitle}
       searchBarPlaceholder="Search models..."
       searchBarAccessory={
         <List.Dropdown
@@ -268,22 +183,19 @@ export default function Command() {
           onChange={(newValue) => setSortMode(newValue as SortMode)}
         >
           <List.Dropdown.Item 
-            key="newest" 
+            key={SORT_OPTIONS.NEWEST} 
             title="Sort by Newest" 
-            value="newest"
-            icon={Icon.Calendar}
+            value={SORT_OPTIONS.NEWEST}
           />
           <List.Dropdown.Item 
-            key="context" 
+            key={SORT_OPTIONS.CONTEXT} 
             title="Sort by Context Length" 
-            value="context"
-            icon={Icon.TextInput}
+            value={SORT_OPTIONS.CONTEXT}
           />
           <List.Dropdown.Item 
-            key="price" 
+            key={SORT_OPTIONS.PRICE} 
             title="Sort by Price" 
-            value="price"
-            icon={Icon.BankNote}
+            value={SORT_OPTIONS.PRICE}
           />
         </List.Dropdown>
       }

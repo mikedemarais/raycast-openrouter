@@ -22,9 +22,31 @@
     {
       "name": "apiKey",
       "type": "password",
-      "required": true,
+      "required": false,
       "title": "OpenRouter API Key",
       "description": "Your OpenRouter API key for accessing models"
+    },
+    {
+      "name": "defaultAction",
+      "type": "dropdown",
+      "required": false,
+      "title": "Default Action",
+      "description": "Choose what happens when you press ↵ on a model",
+      "default": "copy",
+      "data": [
+        {
+          "title": "Copy Model ID",
+          "value": "copy"
+        },
+        {
+          "title": "Open Model Page",
+          "value": "page"
+        },
+        {
+          "title": "Open Chat",
+          "value": "chat"
+        }
+      ]
     }
   ],
   "dependencies": {
