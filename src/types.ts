@@ -8,14 +8,6 @@ export interface ModelInfo {
     completion: number;
   };
   context_length: number;
-  architecture?: {
-    tokenizer?: string;
-    instruct_template?: string;
-  };
-  per_request_limits?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-  };
 }
 
 export interface ModelsResponse {
@@ -23,19 +15,10 @@ export interface ModelsResponse {
   message?: string;
 }
 
-export interface CreditsResponse {
-  data: {
-    total_credits: number;
-    total_usage: number;
-  };
-}
-
 export interface Preferences {
-  apiKey: string;
-  defaultAction: DefaultAction;
+  defaultAction: "copy" | "page";
 }
 
-export type DefaultAction = "copy" | "page" | "chat";
 export type SortMode = "newest" | "context" | "price";
 
 export const SORT_OPTIONS = {
@@ -53,4 +36,4 @@ export const TIME_GROUPS = {
   LAST_MONTH: "Last Month",
 } as const;
 
-export type TimeGroup = typeof TIME_GROUPS[keyof typeof TIME_GROUPS] | string; 
+export type TimeGroup = (typeof TIME_GROUPS)[keyof typeof TIME_GROUPS] | string;

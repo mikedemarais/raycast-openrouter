@@ -1,49 +1,35 @@
-import { getPreferenceValues, showToast, Toast } from "@raycast/api";
+import { showToast, Toast } from "@raycast/api";
 import { useFetch } from "@raycast/utils";
-import { ModelsResponse, CreditsResponse, Preferences } from "./types";
+import { ModelsResponse } from "./types";
 
 const API_BASE_URL = "https://openrouter.ai/api/v1";
 
-const getHeaders = () => {
-  const { apiKey } = getPreferenceValues<Preferences>();
-  return {
-    Authorization: `Bearer ${apiKey}`,
-    "HTTP-Referer": "https://raycast.com/openrouter",
-    "X-Title": "Raycast OpenRouter Extension"
-  };
+// Common headers used in all requests
+const COMMON_HEADERS = {
+  "HTTP-Referer": "https://raycast.com/openrouter",
+  "X-Title": "Raycast OpenRouter Extension",
 };
 
-const handleApiError = (error: Error, context: string) => {
-  console.error(`Error ${context}:`, error);
-  
-  const message = error.message;
-  const isAuthError = message.toLowerCase().includes("unauthorized") || message.includes("401");
-  
+// Helper function for showing error toasts - simplified after credits removal
+const showErrorToast = (error: Error) => {
   showToast({
     style: Toast.Style.Failure,
-    title: isAuthError ? "Invalid API Key" : `Failed to ${context}`,
-    message: isAuthError 
-      ? "Please check your OpenRouter API key in preferences"
-      : message
+    title: "Error",
+    message: error.message,
   });
 };
 
-export function useModels() {
-  return useFetch<ModelsResponse>(`${API_BASE_URL}/models`, {
-    headers: getHeaders(),
+export const useModels = () =>
+  useFetch<ModelsResponse>(`${API_BASE_URL}/models`, {
+    headers: COMMON_HEADERS,
     keepPreviousData: true,
-    onError: (error: Error) => handleApiError(error, "load models")
+    async parseResponse(response) {
+      if (!response.ok) {
+        throw new Error(`Failed to load models: ${response.status}`);
+      }
+      return response.json();
+    },
+    onError(error) {
+      showErrorToast(error);
+    },
   });
-}
-
-export function useCredits() {
-  return useFetch<CreditsResponse>(`${API_BASE_URL}/credits`, {
-    headers: getHeaders(),
-    keepPreviousData: true,
-    onError: (error: Error) => handleApiError(error, "load credits")
-  });
-}
-
-export function getModelProviderFromId(modelId: string): string {
-  return modelId.includes("/") ? modelId.split("/")[0] : "Other";
-} 
