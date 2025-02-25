@@ -19,19 +19,19 @@ Browse and search 300+ AI models available on OpenRouter directly from Raycast, 
 
 ### Browse Recently Added OpenRouter Models
 Search through 300+ AI models available on OpenRouter
-![Browse Recently Added OpenRouter Models](metadata/screenshot1.png)
+![Browse Recently Added OpenRouter Models](assets/openrouter-models-1.png)
 
 ### Search Recently Added OpenRouter Models
 Search through 300+ AI models available on OpenRouter
-![Search Recently Added OpenRouter Models](metadata/screenshot2.png)
+![Search Recently Added OpenRouter Models](assets/openrouter-models-2.png)
 
 ### Sort by Various Parameters
 Sort models by newest, context length, or price
-![Sort by Various Parameters](metadata/screenshot3.png)
+![Sort by Various Parameters](assets/openrouter-models-3.png)
 
 ### Quick Model Actions
 Easily copy model IDs or view documentation
-![Quick Model Actions](metadata/screenshot4.png)
+![Quick Model Actions](assets/openrouter-models-4.png)
 
 ## Installation
 
