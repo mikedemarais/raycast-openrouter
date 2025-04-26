@@ -1,5 +1,5 @@
 import { showToast, Toast } from "@raycast/api";
-import { useFetch } from "@raycast/utils";
+import { useFetch, showFailureToast } from "@raycast/utils";
 import { ModelsResponse } from "./types";
 
 const API_BASE_URL = "https://openrouter.ai/api/v1";
@@ -9,16 +9,6 @@ const COMMON_HEADERS = {
   "HTTP-Referer": "https://raycast.com/openrouter",
   "X-Title": "Raycast OpenRouter Extension",
 };
-
-// Helper function for showing error toasts - simplified after credits removal
-const showErrorToast = (error: Error) => {
-  showToast({
-    style: Toast.Style.Failure,
-    title: "Error",
-    message: error.message,
-  });
-};
-
 export const useModels = () =>
   useFetch<ModelsResponse>(`${API_BASE_URL}/models`, {
     headers: COMMON_HEADERS,
@@ -30,6 +20,6 @@ export const useModels = () =>
       return response.json();
     },
     onError(error) {
-      showErrorToast(error);
+      showFailureToast(error, { title: "Error loading models" });
     },
   });

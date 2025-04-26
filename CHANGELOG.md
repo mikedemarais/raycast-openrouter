@@ -2,7 +2,7 @@
 
 All notable changes to the OpenRouter Models extension will be documented in this file.
 
-## [1.0.0] - 2024-02-25
+## [1.0.0] - {PR_MERGE_DATE}
 
 ### Added
 - Initial release of OpenRouter Models extension
